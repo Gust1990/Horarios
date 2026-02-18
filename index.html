@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dimensión Total V8 (Con Botón Guardar)</title>
+    <title>Dimensión Total V8 (Corregido)</title>
     <style>
         :root {
             --color-study: #dc3545;
@@ -96,7 +96,7 @@
 
         @keyframes heartbeat {
             0% { transform: scale(1); box-shadow: 0 0 0 rgba(0,0,0,0); border-color: #333; }
-            50% { transform: scale(1.04); box-shadow: 0 0 25px rgba(var(--color-active), 0.5); border-color: var(--color-active); }
+            50% { transform: scale(1.02); box-shadow: 0 0 25px rgba(var(--color-active), 0.5); border-color: var(--color-active); }
             100% { transform: scale(1); box-shadow: 0 0 0 rgba(0,0,0,0); border-color: #333; }
         }
 
@@ -110,7 +110,7 @@
         
         .active-row td { border-top: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1); }
 
-        /* --- BOTONES DE CONTROL Y BACKUP --- */
+        /* --- BOTONES DE CONTROL --- */
         .controls-area {
             margin-top: 40px;
             padding-top: 20px;
@@ -132,7 +132,6 @@
             font-size: 0.85em;
         }
 
-        /* ESTILO DEL NUEVO BOTÓN GUARDAR */
         .btn-save { background: #ffc107; color: #000; }
         .btn-save:hover { background: #e0a800; box-shadow: 0 0 10px #ffc107; transform: scale(1.05); }
 
@@ -158,11 +157,11 @@
         <div class="color-grid">
             <div class="color-option">
                 <label>Color Estudio</label>
-                <input type="color" id="clrStudy" value="#dc3545" oninput="updateColors()">
+                <input type="color" id="clrStudy" value="#dc3545" onchange="updateColors()">
             </div>
             <div class="color-option">
                 <label>Color Descanso</label>
-                <input type="color" id="clrRest" value="#0d6efd" oninput="updateColors()">
+                <input type="color" id="clrRest" value="#0d6efd" onchange="updateColors()">
             </div>
         </div>
     </details>
@@ -200,6 +199,7 @@
     const START_HOUR = 8;
     const START_MIN = 0;
     
+    // Tareas por defecto
     const defaultTasks = [
         "Práctica en hoja (Matrices/Sistemas)", "Descanso / Siesta / Videos", 
         "Práctica en hoja (Geometría)", "Almuerzo / Ocio", 
@@ -208,7 +208,9 @@
         "Repaso de Fórmulas", "Cena y Relax"
     ];
 
-    function updateColors() {
+    // Función para actualizar colores
+    // El parámetro 'save' decide si guardamos en localStorage o no
+    function updateColors(save = true) {
         const root = document.documentElement;
         const s = document.getElementById('clrStudy').value;
         const r = document.getElementById('clrRest').value;
@@ -217,7 +219,9 @@
         root.style.setProperty('--color-rest', r);
         root.style.setProperty('--color-active', '#00ff00'); 
         
-        saveData(); 
+        if(save) {
+            saveData(); 
+        }
     }
 
     function generateSchedule(savedTasks = null) {
@@ -239,8 +243,10 @@
             let badgeClass = isStudy ? "badge-study" : "badge-rest";
             let typeText = isStudy ? "ESTUDIO" : "LIBRE";
             
-            let taskVal = savedTasks ? savedTasks[i] : defaultTasks[i];
+            // Si hay tareas guardadas las usa, sino usa las default
+            let taskVal = (savedTasks && savedTasks[i]) ? savedTasks[i] : defaultTasks[i];
 
+            // oninput="saveData()" asegura que se guarde al escribir
             let row = `
             <tr class="${rowClass}" data-start="${currentDate.getHours() * 60 + currentDate.getMinutes()}" data-end="${endDate.getHours() * 60 + endDate.getMinutes()}">
                 <td>${startStr} - ${endStr}</td>
@@ -260,7 +266,12 @@
 
     function getDataObject() {
         const tasks = [];
-        document.querySelectorAll('.editable-task').forEach(input => tasks.push(input.value));
+        const inputs = document.querySelectorAll('.editable-task');
+        
+        // Si no hay inputs (la tabla no se generó), NO devolvemos datos para evitar guardar vacío
+        if(inputs.length === 0) return null;
+
+        inputs.forEach(input => tasks.push(input.value));
         
         return {
             examDate: document.getElementById('examDate').value,
@@ -269,31 +280,43 @@
                 study: document.getElementById('clrStudy').value,
                 rest: document.getElementById('clrRest').value
             },
-            version: 'v8'
+            version: 'v8_fixed'
         };
     }
 
-    // Función de guardado silencioso (automático)
     function saveData() {
         const data = getDataObject();
-        localStorage.setItem('dimTotal_v7', JSON.stringify(data));
+        if (data) {
+            // Guardamos en la nueva versión fija
+            localStorage.setItem('dimTotal_v8_fixed', JSON.stringify(data));
+        }
     }
 
-    // NUEVA FUNCIÓN: Guardado manual con alerta
     function manualSave() {
         saveData();
-        alert("✅ ¡Todos los cambios han sido guardados correctamente!");
+        alert("✅ ¡Cambios guardados correctamente!");
     }
 
     function loadData() {
-        const saved = localStorage.getItem('dimTotal_v7');
+        // Intentamos cargar la versión fija
+        const saved = localStorage.getItem('dimTotal_v8_fixed');
+        
         if (saved) {
-            const data = JSON.parse(saved);
-            applyData(data);
+            try {
+                const data = JSON.parse(saved);
+                applyData(data);
+            } catch (e) {
+                console.error("Error leyendo datos, iniciando default...");
+                initDefault();
+            }
         } else {
-            generateSchedule(null);
-            setDefaultDate();
+            initDefault();
         }
+    }
+
+    function initDefault() {
+        generateSchedule(null);
+        setDefaultDate();
     }
 
     function setDefaultDate() {
@@ -305,34 +328,38 @@
     }
 
     function applyData(data) {
+        // 1. IMPORTANTE: Generar la tabla PRIMERO
+        generateSchedule(data.tasks);
+
+        // 2. LUEGO poner la fecha
         if(data.examDate) document.getElementById('examDate').value = data.examDate;
         
+        // 3. FINALMENTE los colores (sin autoguardar)
         if(data.colors) {
             document.getElementById('clrStudy').value = data.colors.study;
             document.getElementById('clrRest').value = data.colors.rest;
-            updateColors();
+            updateColors(false); // false = no guardar ahora mismo
         }
-        generateSchedule(data.tasks);
     }
 
     function clearData() {
-        if(confirm("¿Estás seguro de BORRAR toda la configuración y reiniciar?")) {
-            localStorage.removeItem('dimTotal_v7');
+        if(confirm("¿Estás seguro de BORRAR todo y empezar de cero?")) {
+            localStorage.removeItem('dimTotal_v8_fixed');
             location.reload();
         }
     }
 
-    // --- FUNCIONES DE BACKUP ---
+    // --- BACKUP ---
 
     function downloadBackup() {
         const data = getDataObject();
+        if(!data) { alert("Error: No hay datos cargados."); return; }
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
         const downloadAnchorNode = document.createElement('a');
         const fileName = "estudio_backup_" + new Date().toISOString().slice(0,10) + ".json";
-        
         downloadAnchorNode.setAttribute("href", dataStr);
         downloadAnchorNode.setAttribute("download", fileName);
-        document.body.appendChild(downloadAnchorNode); // required for firefox
+        document.body.appendChild(downloadAnchorNode);
         downloadAnchorNode.click();
         downloadAnchorNode.remove();
     }
@@ -340,51 +367,50 @@
     function loadBackup(input) {
         const file = input.files[0];
         if(!file) return;
-
         const reader = new FileReader();
         reader.onload = function(event) {
             try {
                 const jsonObj = JSON.parse(event.target.result);
-                // Validar estructura básica
                 if(jsonObj.tasks || jsonObj.examDate) {
-                    localStorage.setItem('dimTotal_v7', JSON.stringify(jsonObj));
+                    localStorage.setItem('dimTotal_v8_fixed', JSON.stringify(jsonObj));
                     applyData(jsonObj);
-                    alert("✅ Configuración restaurada con éxito.");
-                } else {
-                    alert("❌ El archivo no parece ser un backup válido.");
-                }
-            } catch(e) {
-                alert("❌ Error al leer el archivo JSON.");
-            }
+                    alert("✅ Restaurado con éxito.");
+                } else alert("❌ Archivo inválido.");
+            } catch(e) { alert("❌ Error al leer archivo."); }
         };
         reader.readAsText(file);
-        // Limpiar input para permitir recargar el mismo archivo si es necesario
         input.value = '';
     }
 
     function updateSystem() {
+        // Cuenta regresiva
         const examVal = document.getElementById('examDate').value;
         if (examVal) {
             const now = new Date().getTime();
             const examTime = new Date(examVal).getTime();
             const dist = examTime - now;
 
+            const timerBox = document.getElementById('countdown');
             if (dist < 0) {
-                document.getElementById('countdown').innerHTML = "¡AHORA!";
+                timerBox.innerHTML = "¡TIEMPO!";
+                timerBox.style.color = "red";
             } else {
                 const d = Math.floor(dist / (1000 * 60 * 60 * 24));
                 const h = Math.floor((dist % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                 const m = Math.floor((dist % (1000 * 60 * 60)) / (1000 * 60));
                 const s = Math.floor((dist % (1000 * 60)) / 1000);
-                document.getElementById('countdown').innerHTML = `${d}d ${h}h ${m}m ${s}s`;
+                timerBox.innerHTML = `${d}d ${h}h ${m}m ${s}s`;
+                // Restaurar color si no es tiempo cumplido
+                const rootStyle = getComputedStyle(document.documentElement);
+                timerBox.style.color = rootStyle.getPropertyValue('--color-study');
             }
         }
 
+        // Fila activa (latido)
         const now = new Date();
         const currentMinutes = now.getHours() * 60 + now.getMinutes();
         
-        const rows = document.querySelectorAll('tbody tr');
-        rows.forEach(row => {
+        document.querySelectorAll('tbody tr').forEach(row => {
             let start = parseInt(row.getAttribute('data-start'));
             let end = parseInt(row.getAttribute('data-end'));
             
@@ -396,6 +422,7 @@
         });
     }
 
+    // ARRANQUE
     loadData();
     setInterval(updateSystem, 1000);
     updateSystem();
