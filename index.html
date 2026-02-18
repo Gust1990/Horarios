@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dimensión Total V8 (Con Botón Guardar)</title>
+    <style>
+        :root {
+            --color-study: #dc3545;
+            --color-rest: #0d6efd;
+            --color-active: #00ff00;
+        }
+
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: #050505; 
+            color: #ffffff; 
+            text-align: center; 
+            padding: 20px; 
+        }
+
+        .container { 
+            max-width: 900px; 
+            margin: auto; 
+            background: #111111; 
+            padding: 25px; 
+            border-radius: 15px; 
+            box-shadow: 0 0 40px rgba(0,0,0,0.8); 
+            border: 1px solid #333;
+        }
+
+        details {
+            background: #222;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: left;
+            padding: 10px;
+            border: 1px solid #444;
+        }
+        summary { cursor: pointer; font-weight: bold; color: #aaa; outline: none; }
+        .color-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .color-option label { display: block; font-size: 0.8em; color: #888; margin-bottom: 5px; }
+        input[type="color"] { width: 100%; height: 40px; border: none; cursor: pointer; background: none; }
+
+        input[type="datetime-local"] { 
+            padding: 10px; 
+            border-radius: 5px; 
+            background: #222; 
+            color: white; 
+            border: 1px solid #555; 
+            font-size: 1.1em;
+            width: 80%;
+            margin-top: 5px;
+        }
+
+        .timer-box { 
+            font-size: 3.5em; 
+            font-weight: 900;
+            color: var(--color-study); 
+            text-shadow: 0 0 20px currentColor;
+            margin: 25px 0;
+            font-family: monospace;
+            transition: color 0.5s;
+        }
+
+        table { width: 100%; border-collapse: separate; border-spacing: 0 12px; margin-top: 20px; }
+        
+        tr { 
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            transition: all 0.3s ease; 
+        }
+        
+        td { padding: 15px; vertical-align: middle; }
+        td:first-child { border-radius: 8px 0 0 8px; border-left: 6px solid transparent; }
+        td:last-child { border-radius: 0 8px 8px 0; }
+
+        .row-study td:first-child { border-left-color: var(--color-study); }
+        .row-rest td:first-child { border-left-color: var(--color-rest); }
+        
+        .badge { padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 0.9em; display: inline-block; color: white;}
+        .badge-study { background: var(--color-study); }
+        .badge-rest { background: var(--color-rest); }
+
+        .editable-task { 
+            background: transparent; 
+            color: #fff; 
+            border: none; 
+            border-bottom: 1px dashed #555;
+            width: 100%; 
+            font-size: 1.1em; 
+            font-family: inherit;
+            padding: 5px;
+        }
+        .editable-task:focus { outline: none; border-bottom: 1px solid #fff; }
+
+        @keyframes heartbeat {
+            0% { transform: scale(1); box-shadow: 0 0 0 rgba(0,0,0,0); border-color: #333; }
+            50% { transform: scale(1.04); box-shadow: 0 0 25px rgba(var(--color-active), 0.5); border-color: var(--color-active); }
+            100% { transform: scale(1); box-shadow: 0 0 0 rgba(0,0,0,0); border-color: #333; }
+        }
+
+        .active-row {
+            z-index: 100;
+            position: relative;
+            background: #1f1f1f !important;
+            border: 1px solid transparent; 
+            animation: heartbeat 2s infinite ease-in-out; 
+        }
+        
+        .active-row td { border-top: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1); }
+
+        /* --- BOTONES DE CONTROL Y BACKUP --- */
+        .controls-area {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #333;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            font-size: 0.85em;
+        }
+
+        /* ESTILO DEL NUEVO BOTÓN GUARDAR */
+        .btn-save { background: #ffc107; color: #000; }
+        .btn-save:hover { background: #e0a800; box-shadow: 0 0 10px #ffc107; transform: scale(1.05); }
+
+        .btn-backup { background: #198754; color: white; }
+        .btn-backup:hover { background: #157347; box-shadow: 0 0 10px #198754; }
+
+        .btn-restore { background: #0d6efd; color: white; }
+        .btn-restore:hover { background: #0b5ed7; box-shadow: 0 0 10px #0d6efd; }
+
+        .btn-reset { background: transparent; border: 1px solid #444; color: #666; }
+        .btn-reset:hover { color: red; border-color: red; background: rgba(255,0,0,0.1); }
+
+        #fileInput { display: none; }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <details>
+        <summary>🎨 Personalizar Colores</summary>
+        <div class="color-grid">
+            <div class="color-option">
+                <label>Color Estudio</label>
+                <input type="color" id="clrStudy" value="#dc3545" oninput="updateColors()">
+            </div>
+            <div class="color-option">
+                <label>Color Descanso</label>
+                <input type="color" id="clrRest" value="#0d6efd" oninput="updateColors()">
+            </div>
+        </div>
+    </details>
+
+    <label>🏁 FECHA DEL EXAMEN: </label><br>
+    <input type="datetime-local" id="examDate" onchange="saveData()">
+
+    <div class="timer-box" id="countdown">--</div>
+
+    <table>
+        <thead>
+            <tr>
+                <th width="25%">HORARIO</th>
+                <th width="15%">MODO</th>
+                <th>TAREA</th>
+            </tr>
+        </thead>
+        <tbody id="scheduleBody">
+        </tbody>
+    </table>
+
+    <div class="controls-area">
+        <button class="btn btn-save" onclick="manualSave()">💾 Guardar Cambios</button>
+        
+        <button class="btn btn-backup" onclick="downloadBackup()">⬇️ Descargar Backup</button>
+        <button class="btn btn-restore" onclick="document.getElementById('fileInput').click()">⬆️ Restaurar Backup</button>
+        <button class="btn btn-reset" onclick="clearData()">⚠️ Resetear Todo</button>
+    </div>
+
+    <input type="file" id="fileInput" accept=".json" onchange="loadBackup(this)">
+
+</div>
+
+<script>
+    const START_HOUR = 8;
+    const START_MIN = 0;
+    
+    const defaultTasks = [
+        "Práctica en hoja (Matrices/Sistemas)", "Descanso / Siesta / Videos", 
+        "Práctica en hoja (Geometría)", "Almuerzo / Ocio", 
+        "Práctica Guiada (Videos + Papel)", "Siesta / Merienda", 
+        "Revisión de Errores", "Videos Teóricos (Pasivo)", 
+        "Repaso de Fórmulas", "Cena y Relax"
+    ];
+
+    function updateColors() {
+        const root = document.documentElement;
+        const s = document.getElementById('clrStudy').value;
+        const r = document.getElementById('clrRest').value;
+
+        root.style.setProperty('--color-study', s);
+        root.style.setProperty('--color-rest', r);
+        root.style.setProperty('--color-active', '#00ff00'); 
+        
+        saveData(); 
+    }
+
+    function generateSchedule(savedTasks = null) {
+        const body = document.getElementById('scheduleBody');
+        body.innerHTML = '';
+        
+        let currentDate = new Date();
+        currentDate.setHours(START_HOUR, START_MIN, 0, 0);
+        
+        let htmlContent = '';
+
+        for (let i = 0; i < 10; i++) {
+            let startStr = formatTime(currentDate);
+            let endDate = new Date(currentDate.getTime() + 90 * 60000);
+            let endStr = formatTime(endDate);
+
+            let isStudy = (i % 2 === 0);
+            let rowClass = isStudy ? "row-study" : "row-rest";
+            let badgeClass = isStudy ? "badge-study" : "badge-rest";
+            let typeText = isStudy ? "ESTUDIO" : "LIBRE";
+            
+            let taskVal = savedTasks ? savedTasks[i] : defaultTasks[i];
+
+            let row = `
+            <tr class="${rowClass}" data-start="${currentDate.getHours() * 60 + currentDate.getMinutes()}" data-end="${endDate.getHours() * 60 + endDate.getMinutes()}">
+                <td>${startStr} - ${endStr}</td>
+                <td><span class="badge ${badgeClass}">${typeText}</span></td>
+                <td><input class="editable-task" value="${taskVal}" oninput="saveData()"></td>
+            </tr>`;
+            
+            htmlContent += row;
+            currentDate = endDate;
+        }
+        body.innerHTML = htmlContent;
+    }
+
+    function formatTime(date) {
+        return date.toTimeString().slice(0, 5);
+    }
+
+    function getDataObject() {
+        const tasks = [];
+        document.querySelectorAll('.editable-task').forEach(input => tasks.push(input.value));
+        
+        return {
+            examDate: document.getElementById('examDate').value,
+            tasks: tasks,
+            colors: {
+                study: document.getElementById('clrStudy').value,
+                rest: document.getElementById('clrRest').value
+            },
+            version: 'v8'
+        };
+    }
+
+    // Función de guardado silencioso (automático)
+    function saveData() {
+        const data = getDataObject();
+        localStorage.setItem('dimTotal_v7', JSON.stringify(data));
+    }
+
+    // NUEVA FUNCIÓN: Guardado manual con alerta
+    function manualSave() {
+        saveData();
+        alert("✅ ¡Todos los cambios han sido guardados correctamente!");
+    }
+
+    function loadData() {
+        const saved = localStorage.getItem('dimTotal_v7');
+        if (saved) {
+            const data = JSON.parse(saved);
+            applyData(data);
+        } else {
+            generateSchedule(null);
+            setDefaultDate();
+        }
+    }
+
+    function setDefaultDate() {
+        let defDate = new Date();
+        defDate.setDate(defDate.getDate() + 7);
+        defDate.setHours(9, 0, 0); 
+        const offset = defDate.getTimezoneOffset() * 60000;
+        document.getElementById('examDate').value = (new Date(defDate - offset)).toISOString().slice(0, 16);
+    }
+
+    function applyData(data) {
+        if(data.examDate) document.getElementById('examDate').value = data.examDate;
+        
+        if(data.colors) {
+            document.getElementById('clrStudy').value = data.colors.study;
+            document.getElementById('clrRest').value = data.colors.rest;
+            updateColors();
+        }
+        generateSchedule(data.tasks);
+    }
+
+    function clearData() {
+        if(confirm("¿Estás seguro de BORRAR toda la configuración y reiniciar?")) {
+            localStorage.removeItem('dimTotal_v7');
+            location.reload();
+        }
+    }
+
+    // --- FUNCIONES DE BACKUP ---
+
+    function downloadBackup() {
+        const data = getDataObject();
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
+        const downloadAnchorNode = document.createElement('a');
+        const fileName = "estudio_backup_" + new Date().toISOString().slice(0,10) + ".json";
+        
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", fileName);
+        document.body.appendChild(downloadAnchorNode); // required for firefox
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
+
+    function loadBackup(input) {
+        const file = input.files[0];
+        if(!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            try {
+                const jsonObj = JSON.parse(event.target.result);
+                // Validar estructura básica
+                if(jsonObj.tasks || jsonObj.examDate) {
+                    localStorage.setItem('dimTotal_v7', JSON.stringify(jsonObj));
+                    applyData(jsonObj);
+                    alert("✅ Configuración restaurada con éxito.");
+                } else {
+                    alert("❌ El archivo no parece ser un backup válido.");
+                }
+            } catch(e) {
+                alert("❌ Error al leer el archivo JSON.");
+            }
+        };
+        reader.readAsText(file);
+        // Limpiar input para permitir recargar el mismo archivo si es necesario
+        input.value = '';
+    }
+
+    function updateSystem() {
+        const examVal = document.getElementById('examDate').value;
+        if (examVal) {
+            const now = new Date().getTime();
+            const examTime = new Date(examVal).getTime();
+            const dist = examTime - now;
+
+            if (dist < 0) {
+                document.getElementById('countdown').innerHTML = "¡AHORA!";
+            } else {
+                const d = Math.floor(dist / (1000 * 60 * 60 * 24));
+                const h = Math.floor((dist % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const m = Math.floor((dist % (1000 * 60 * 60)) / (1000 * 60));
+                const s = Math.floor((dist % (1000 * 60)) / 1000);
+                document.getElementById('countdown').innerHTML = `${d}d ${h}h ${m}m ${s}s`;
+            }
+        }
+
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        
+        const rows = document.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            let start = parseInt(row.getAttribute('data-start'));
+            let end = parseInt(row.getAttribute('data-end'));
+            
+            if (currentMinutes >= start && currentMinutes < end) {
+                row.classList.add('active-row');
+            } else {
+                row.classList.remove('active-row');
+            }
+        });
+    }
+
+    loadData();
+    setInterval(updateSystem, 1000);
+    updateSystem();
+
+</script>
+
+</body>
+</html>
